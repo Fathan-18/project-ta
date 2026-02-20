@@ -1,0 +1,221 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 217 91% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 214 32% 91%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 214 32% 91%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 214 32% 91%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 217 91% 50%;
+
+    --radius: 0.5rem;
+
+    /* Severity colors */
+    --severity-disaster: 0 84% 60%;
+    --severity-high: 25 95% 53%;
+    --severity-warning: 45 93% 47%;
+    --severity-info: 217 91% 60%;
+    --severity-ok: 142 71% 45%;
+
+    /* Status colors */
+    --status-online: 142 71% 45%;
+    --status-offline: 0 84% 60%;
+    --status-warning: 45 93% 47%;
+
+    /* Chart colors */
+    --chart-red: 0 84% 60%;
+    --chart-orange: 25 95% 53%;
+    --chart-yellow: 45 93% 47%;
+    --chart-purple: 270 70% 60%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 220 25% 10%;
+    --foreground: 210 40% 98%;
+
+    --card: 220 25% 13%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 220 25% 13%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 220 25% 10%;
+
+    --secondary: 220 20% 18%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 220 20% 18%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 220 20% 22%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 20% 22%;
+    --input: 220 20% 18%;
+    --ring: 217 91% 60%;
+
+    --sidebar-background: 220 25% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 20% 18%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 220 20% 22%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  .font-mono {
+    font-family: 'IBM Plex Mono', monospace;
+  }
+}
+
+@layer components {
+  .severity-disaster {
+    @apply bg-red-500/15 text-red-500 border-l-4 border-l-red-500;
+  }
+
+  .severity-high {
+    @apply bg-orange-500/15 text-orange-500 border-l-4 border-l-orange-500;
+  }
+
+  .severity-warning {
+    @apply bg-yellow-500/15 text-yellow-500 border-l-4 border-l-yellow-500;
+  }
+
+  .severity-info {
+    @apply bg-blue-500/15 text-blue-500 border-l-4 border-l-blue-500;
+  }
+
+  .severity-ok {
+    @apply bg-emerald-500/15 text-emerald-500 border-l-4 border-l-emerald-500;
+  }
+
+  .status-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+
+  .status-online {
+    @apply bg-emerald-500;
+  }
+
+  .status-offline {
+    @apply bg-red-500;
+  }
+
+  .stat-card {
+    @apply bg-card border border-border rounded-lg p-5 transition-all;
+  }
+
+  .stat-card-highlight-green {
+    @apply bg-card border-2 border-emerald-500/50 rounded-lg p-5;
+  }
+
+  .stat-card-highlight-red {
+    @apply bg-card border-2 border-red-500/50 rounded-lg p-5;
+  }
+
+  .metric-card {
+    @apply bg-card border border-border rounded-lg p-4 text-center;
+  }
+
+  .panel-card {
+    @apply bg-card border border-border rounded-lg overflow-hidden;
+  }
+
+  .search-input {
+    @apply w-full bg-secondary border border-border rounded-lg px-4 py-2 text-sm 
+           placeholder:text-muted-foreground focus:outline-none focus:ring-2 
+           focus:ring-primary/50 focus:border-primary transition-all;
+  }
+
+  .log-entry {
+    @apply py-3 px-4 border-l-4 transition-colors;
+  }
+
+  .log-brute-force {
+    @apply border-l-red-500 bg-red-500/5;
+  }
+
+  .log-ddos {
+    @apply border-l-purple-500 bg-purple-500/5;
+  }
+
+  .log-auth-fail {
+    @apply border-l-orange-500 bg-orange-500/5;
+  }
+
+  .log-info {
+    @apply border-l-blue-500 bg-blue-500/5;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 3px;
+  }
+}

@@ -1,0 +1,163 @@
+import { useEffect, useState } from "react";
+
+import { Header } from '@/components/monitoring/Header';
+import { StatsCards } from '@/components/monitoring/StatsCards';
+import { SecurityMetrics } from '@/components/monitoring/SecurityMetrics';
+import { ZabbixProblems } from '@/components/monitoring/ZabbixProblems';
+import { ElasticLogs } from '@/components/monitoring/ElasticLogs';
+import { SecurityChart } from '@/components/monitoring/SecurityChart';
+import { HostsTable } from '@/components/monitoring/HostsTable';
+
+import {
+  mockSecurityMetrics,
+  mockLogs,
+  mockSecurityEvents,
+} from '@/data/mockData';
+
+const Index = () => {
+
+  const [realHosts, setRealHosts] = useState<any[]>([]);
+  const [realProblems, setRealProblems] = useState<any[]>([]);
+
+  const [realStats, setRealStats] = useState({
+    totalHosts: 0,
+    serversUp: 0,
+    serversDown: 0,
+    upPercentage: 0,
+  });
+
+
+  useEffect(() => {
+
+    const fetchHosts = async () => {
+      try {
+
+        const res = await fetch("http://10.10.10.1:3001/api/zabbix/hosts");
+        const data = await res.json();
+
+        if (!Array.isArray(data)) return;
+
+        // ================= HOST TABLE =================
+        const mappedHosts = data.map((h: any) => ({
+
+          id: h.hostid,
+          hostname: h.host,
+          ip: h.ip || "-",
+
+          status:
+            h.available == 1
+              ? "online"
+              : h.status == 2
+              ? "offline"
+              : "unknown",
+
+          cpu: Number(h.cpu)?.toFixed(1) || 0,
+          ram: Number(h.ram)?.toFixed(1) || 0,
+
+          bwIn: h.bwIn || "0 bps",
+          bwOut: h.bwOut || "0 bps",
+          lastCheck: "just now",
+
+        }));
+
+        setRealHosts(mappedHosts);
+
+
+        // ================= STATS =================
+        const total = data.length;
+
+        const up = data.filter((h: any) => h.available == 1).length;
+        const down = data.filter((h: any) => h.available == 2).length;
+
+        const uptime =
+          total > 0
+            ? Number(((up / total) * 100).toFixed(2))
+            : 0;
+
+        setRealStats({
+          totalHosts: total,
+          serversUp: up,
+          serversDown: down,
+          upPercentage: uptime,
+        });
+
+      } catch (err) {
+        console.error("Fetch hosts error:", err);
+      }
+    };
+
+
+    const fetchProblems = async () => {
+      try {
+
+        const res = await fetch("http://10.10.10.1:3001/api/zabbix/problems");
+        const data = await res.json();
+
+        if (!Array.isArray(data)) return;
+
+        const mappedProblems = data.map((p: any) => ({
+
+          id: p.eventid,
+          host: p.host || "Unknown",
+          problem: p.name,
+
+          severity:
+            p.severity == 5 ? "disaster" :
+            p.severity == 4 ? "high" :
+            p.severity == 3 ? "warning" :
+            "info",
+
+          timestamp: "now",
+          duration: "active",
+
+        }));
+
+        setRealProblems(mappedProblems);
+
+      } catch (err) {
+        console.error("Fetch problems error:", err);
+      }
+    };
+
+
+    fetchHosts();
+    fetchProblems();
+
+  }, []);
+
+
+  return (
+    <div className="min-h-screen bg-background px-4 lg:px-6 py-4">
+      <div className="max-w-[1600px] mx-auto">
+
+        <Header />
+
+        {/* ===== REAL STATS ===== */}
+        <StatsCards stats={realStats} />
+
+        <SecurityMetrics metrics={mockSecurityMetrics} />
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+          <div className="h-[400px]">
+            <ZabbixProblems problems={realProblems} />
+          </div>
+
+          <div className="h-[400px]">
+            <ElasticLogs logs={mockLogs} />
+          </div>
+
+          <div className="h-[400px]">
+            <SecurityChart data={mockSecurityEvents} />
+          </div>
+
+        </div>
+
+        <HostsTable hosts={realHosts} />
+
+      </div>
+    </div>
+  );
+};
+
+export default Index;
