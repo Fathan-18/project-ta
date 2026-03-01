@@ -62,8 +62,30 @@ export function ZabbixProblems({ problems }: ZabbixProblemsProps) {
       p.severity === 'average'
   ).length;
 
-  return (
-    <div className="panel-card h-full flex flex-col">
+  const formatDateTime = (unix: number | string) => {
+    const date = new Date(Number(unix) * 1000);
+
+    return (
+      date.toLocaleDateString("en-GB") +
+      "  |  " +
+      date.toLocaleTimeString("en-US")
+    );
+  };
+
+  const timeAgo = (unix: number | string) => {
+    const seconds = Math.floor(
+      Date.now() / 1000 - Number(unix)
+    );
+
+    if (seconds < 60) return "Just now";
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} Minutes Ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} Hours Ago`;
+
+    return `${Math.floor(seconds / 86400)} Days Ago`;
+  };
+
+   return (
+   <div className="panel-card h-full flex flex-col">
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center gap-2">
           <AlertTriangle className="w-5 h-5 text-yellow-500" />
@@ -103,56 +125,61 @@ export function ZabbixProblems({ problems }: ZabbixProblemsProps) {
             const Icon = config.icon;
 
             return (
-                <div
+              <div
                 key={problem.id}
                 className={cn(
-                    'p-4 border-b border-border last:border-b-0',
-                    config.className
+                  'p-4 border-b border-border last:border-b-0',
+                  config.className
                 )}
-                >
-                {/* Severity + Time */}
-                <div className="flex items-center gap-2 mb-1">
-                    <Icon className={cn('w-4 h-4', config.textClass)} />
+              >
+                <div className="flex justify-between items-start">
 
-                    <span
-                    className={cn(
-                        'text-xs font-semibold uppercase',
-                        config.textClass
-                    )}
-                    >
-                    {config.label}
+                  {/* LEFT SIDE */}
+                  <div>
+
+                    <div className="flex items-center gap-2 mb-1">
+                      <Icon className={cn('w-4 h-4', config.textClass)} />
+
+                      <span
+                        className={cn(
+                          'text-xs font-semibold uppercase',
+                          config.textClass
+                        )}
+                      >
+                        {config.label}
+                      </span>
+                    </div>
+
+                    <div className="font-semibold">
+                      {problem.host}
+                    </div>
+
+                    <div className="text-sm text-muted-foreground">
+                      {problem.problem}
+                    </div>
+
+                  </div>
+
+                  {/* RIGHT SIDE */}
+                  <div className="text-right">
+
+                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-red-500/20 text-red-500">
+                      ACTIVE
                     </span>
 
-                    <span className="text-xs text-muted-foreground ml-auto font-mono">
-                    {problem.timestamp}
-                    </span>
-                </div>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <div>
+                        {formatDateTime(problem.rawTimestamp)}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {timeAgo(problem.rawTimestamp)}
+                      </div>
+                    </div>
 
-                {/* Host + Status */}
-                <div className="flex items-center justify-between">
-                    <p className="font-medium text-foreground">
-                    {problem.host || "Unknown Host"}
-                    </p>
+                  </div>
 
-                    <span
-                    className={cn(
-                        "text-xs px-2 py-0.5 rounded-md font-semibold",
-                        problem.duration === "resolved"
-                        ? "bg-emerald-500/15 text-emerald-500"
-                        : "bg-red-500/15 text-red-500"
-                    )}
-                    >
-                    {problem.duration === "resolved"
-                        ? "RESOLVED"
-                        : "ACTIVE"}
-                    </span>
                 </div>
-
-                {/* Problem Text */}
-                <p className="text-sm text-muted-foreground mt-0.5">
-                    {problem.problem}
-                </p>
-                </div>
+              </div>
             );
           })
         )}

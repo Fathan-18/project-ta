@@ -13,9 +13,10 @@ export interface ZabbixProblem {
 export interface ElasticLog {
   id: string;
   timestamp: string;
-  level: 'INFO' | 'WARN' | 'CRIT' | 'ERROR';
-  message: string;
-  source?: string;
+  ip?: string;
+  method?: string;
+  path?: string;
+  status?: number;
   type?: LogType;
 }
 

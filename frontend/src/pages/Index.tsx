@@ -7,6 +7,7 @@ import { ZabbixProblems } from '@/components/monitoring/ZabbixProblems';
 import { ElasticLogs } from '@/components/monitoring/ElasticLogs';
 import { SecurityChart } from '@/components/monitoring/SecurityChart';
 import { HostsTable } from '@/components/monitoring/HostsTable';
+import { AttackChart } from "@/components/monitoring/AttackChart";
 
 import {
   mockSecurityMetrics,
@@ -110,7 +111,7 @@ const Index = () => {
           p.priority == 1 ? "info" :
           "info",
 
-        timestamp: formatTimeAgo(p.lastchange),
+        rawTimestamp: p.lastchange,
 
         duration:
           p.value == "0"
@@ -131,31 +132,14 @@ const Index = () => {
 
   const fetchElasticLogs = async () => {
     try {
-
       const res = await fetch(
-        "http://10.10.10.1:3001/api/elastic/logs"
+        "http://10.10.10.1:3001/api/elastic/logs?all=true"
       );
 
       const data = await res.json();
 
-      const mapped = data.map((l: any) => ({
+      setRealElasticLogs(data);
 
-        id: l.timestamp,
-
-        host: l.host,
-
-        message: l.message,
-
-        ip: l.ip,
-
-        timestamp: formatTimeAgo(
-          Date.parse(l.timestamp) / 1000
-        )
-
-      }));
-
-      setRealElasticLogs(mapped);
- 
     } catch (err) {
       console.error("Elastic fetch error:", err);
     }
@@ -190,8 +174,7 @@ const Index = () => {
 
   };
 
-
-  return (
+  return (    
     <div className="min-h-screen bg-background px-4 lg:px-6 py-4">
       <div className="max-w-[1600px] mx-auto">
 
@@ -199,6 +182,7 @@ const Index = () => {
           onIntervalChange={handleIntervalChange}
           onManualRefresh={() => {
             fetchDashboard();
+            fetchElasticLogs();
           }}
         />
 
@@ -206,16 +190,28 @@ const Index = () => {
 
         <SecurityMetrics metrics={mockSecurityMetrics} />
 
+        {/* ===== MAIN GRID ===== */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 
+          {/* Zabbix */}
           <div className="h-[400px]">
             <ZabbixProblems problems={realProblems} />
           </div>
 
-          <div className="h-[400px]">
-            <ElasticLogs logs={realElasticLogs} />
+          {/* Elastic Section */}
+          <div className="flex flex-col gap-4">
+
+            {/* Elastic Logs */}
+
+            <div className="h-[400px]">
+
+              <ElasticLogs logs={realElasticLogs} />
+
+            </div>
+
           </div>
 
+          {/* Chart */}
           <div className="h-[400px]">
             <SecurityChart data={mockSecurityEvents} />
           </div>
@@ -226,7 +222,7 @@ const Index = () => {
 
       </div>
     </div>
-  );
-};
+      );
+    };
 
 export default Index;
