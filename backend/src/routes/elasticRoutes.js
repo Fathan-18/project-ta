@@ -1,5 +1,5 @@
-  import express from "express";
-  import axios from "axios";
+import express from "express";
+import axios from "axios";
 
   const router = express.Router();
   const ELASTIC_URL = "http://10.10.10.10:9200";
@@ -14,10 +14,21 @@
           sort: [{ "@timestamp": { order: "desc" } }],
           query: {
             bool: {
+              must: [
+                {
+                  range: {
+                    "@timestamp": {
+                      gte: "now-24h",
+                      lte: "now"
+                    }
+                  }
+                }
+              ],
               should: [
                 { term: { "event.dataset": "nginx.access" } },
                 { term: { "event.dataset": "system.auth" } }
               ],
+              minimum_should_match: 1,
               must_not: [
                 { wildcard: { "url.path": "/zabbix*" } }
               ]
@@ -28,22 +39,21 @@
 
       const hits = response.data.hits.hits;
 
-      const oneMinuteAgo = Date.now() - 60 * 1000;
-
-      // ================= COUNTING LOGIC =================
       const ipCounter = {};
       const sshFailureCounter = {};
 
       hits.forEach(h => {
         const src = h._source;
         const ip = src.source?.ip;
-        const timestamp = new Date(src["@timestamp"]).getTime();
 
         if (!ip) return;
 
-        if (timestamp >= oneMinuteAgo) {
-
+        if (
+          src.event?.dataset === "nginx.access" &&
+          [404, 429, 403].includes(src.http?.response?.status_code)
+        ) {
           ipCounter[ip] = (ipCounter[ip] || 0) + 1;
+        }
 
         if (
           src.event?.dataset === "system.auth" &&
@@ -51,13 +61,10 @@
         ) {
           sshFailureCounter[ip] = (sshFailureCounter[ip] || 0) + 1;
         }
-      }
       });
 
-      // DDOS
       const attackAlerts = [];
 
-      // DDoS Alert
       Object.entries(ipCounter).forEach(([ip, count]) => {
         if (count >= 50) {
           attackAlerts.push({
@@ -80,7 +87,6 @@
         }
       });
 
-      // SSH Bruteforce Alert
       Object.entries(sshFailureCounter).forEach(([ip, count]) => {
         if (count >= 5) {
           attackAlerts.push({
@@ -103,7 +109,6 @@
         }
       });
 
-      // ================= MAP LOGS =================
       const logs = hits.map(h => {
 
         const src = h._source;
@@ -112,7 +117,6 @@
         let severity = "info";
         let attackType = "normal";
 
-        // ================= SSH LOGIC =================
         if (src.event?.dataset === "system.auth") {
 
           const outcome = src.event?.outcome || "";
@@ -143,8 +147,6 @@
           };
         }
 
-        // ================= NGINX LOGIC =================
-
         const status = src.http?.response?.status_code || 0;
         const path = src.url?.path || "";
         const fullUrl = src.url?.original || "";
@@ -171,18 +173,9 @@
 
       });
 
-      const normalLogs = logs.filter(log => log.attackType !== "normal");
-
-      // Jangan tampilkan event individual kalau sudah ada aggregated alert
-      const attackedIPs = new Set(
-        attackAlerts.map(alert => alert.ip)
-      );
-
-      const cleanLogs = normalLogs.filter(log => !attackedIPs.has(log.ip));
-
       const finalLogs = [
         ...attackAlerts,
-        ...cleanLogs
+        ...logs
       ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
       res.json(finalLogs);
@@ -198,8 +191,6 @@
 
       const now = new Date();
       const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const last5min = new Date(now.getTime() - 5 * 60 * 1000);
-      const last1min = new Date(now.getTime() - 60 * 1000);
 
       const response = await axios.post(
         `${ELASTIC_URL}/filebeat-*/_search`,
@@ -215,7 +206,18 @@
           },
           aggs: {
 
-            // ================= AUTH FAILURES =================
+            total_nginx: {
+              filter: {
+                term: { "event.dataset": "nginx.access" }
+              }
+            },
+
+            total_auth_activity: {
+              filter: {
+                term: { "event.dataset": "system.auth" }
+              }
+            },
+
             auth_failures: {
               filter: {
                 bool: {
@@ -227,21 +229,27 @@
               }
             },
 
-            // ================= SSH FAIL PER IP (5 MIN WINDOW) =================
+            nginx_errors: {
+              filter: {
+                bool: {
+                  must: [
+                    { term: { "event.dataset": "nginx.access" } },
+                    {
+                      terms: {
+                        "http.response.status_code": [404, 429, 403]
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+
             ssh_fail_by_ip: {
               filter: {
                 bool: {
                   must: [
                     { term: { "event.dataset": "system.auth" } },
-                    { term: { "event.outcome": "failure" } },
-                    {
-                      range: {
-                        "@timestamp": {
-                          gte: last5min.toISOString(),
-                          lte: now.toISOString()
-                        }
-                      }
-                    }
+                    { term: { "event.outcome": "failure" } }
                   ]
                 }
               },
@@ -255,18 +263,14 @@
               }
             },
 
-            // ================= NGINX PER IP (1 MIN WINDOW) =================
             nginx_by_ip: {
               filter: {
                 bool: {
                   must: [
                     { term: { "event.dataset": "nginx.access" } },
                     {
-                      range: {
-                        "@timestamp": {
-                          gte: last1min.toISOString(),
-                          lte: now.toISOString()
-                        }
+                      terms: {
+                        "http.response.status_code": [404, 429, 403]
                       }
                     }
                   ]
@@ -282,33 +286,10 @@
               }
             },
 
-            // ================= TOTAL EVENTS =================
-            total_events: {
-              value_count: { field: "@timestamp" }
-            },
-
-            // ================= PER HOUR BREAKDOWN =================
             per_hour: {
               date_histogram: {
                 field: "@timestamp",
                 calendar_interval: "hour"
-              },
-              aggs: {
-                ssh_failures: {
-                  filter: {
-                    bool: {
-                      must: [
-                        { term: { "event.dataset": "system.auth" } },
-                        { term: { "event.outcome": "failure" } }
-                      ]
-                    }
-                  }
-                },
-                nginx_requests: {
-                  filter: {
-                    term: { "event.dataset": "nginx.access" }
-                  }
-                }
               }
             }
 
@@ -318,14 +299,12 @@
 
       const agg = response.data.aggregations;
 
-      // ================= CALCULATE BRUTE FORCE =================
       const bruteForceIPs =
         agg.ssh_fail_by_ip.by_ip.buckets
           .filter(b => b.doc_count >= 5);
 
       const bruteForceCount = bruteForceIPs.length;
 
-      // ================= CALCULATE DDOS =================
       const ddosIPs =
         agg.nginx_by_ip.by_ip.buckets
           .filter(b => b.doc_count >= 50);
@@ -333,15 +312,31 @@
       const ddosCount = ddosIPs.length;
 
       res.json({
+
+      traffic: {
+        totalRequests: agg.total_nginx.doc_count,
+        totalAuthActivity: agg.total_auth_activity.doc_count
+      },
+
+      securityEvents: {
+        authFailures: agg.auth_failures.doc_count,
+        nginxErrors: agg.nginx_errors.doc_count
+      },
+
+      incidents: {
         bruteForce: bruteForceCount,
         ddos: ddosCount,
-        authFailures: agg.auth_failures.doc_count,
-        totalEvents: agg.total_events.value,
-        eventsPerHour: agg.per_hour.buckets
-      });
+        zabbixProblems: 0
+      },
+
+      totalIncidents:
+        bruteForceCount +
+        ddosCount
+
+    });
 
     } catch (err) {
-      console.error("Stats error:", err.message);
+      console.error("Stat s error:", err.message);
       res.status(500).json({ error: err.message });
     }
   });

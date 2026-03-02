@@ -9,12 +9,6 @@ import { SecurityChart } from '@/components/monitoring/SecurityChart';
 import { HostsTable } from '@/components/monitoring/HostsTable';
 import { AttackChart } from "@/components/monitoring/AttackChart";
 
-import {
-  mockSecurityMetrics,
-  mockLogs,
-  mockSecurityEvents,
-} from '@/data/mockData';
-
 const Index = () => {
 
   const [lastUpdate, setLastUpdate] = useState(Date.now());
@@ -22,6 +16,7 @@ const Index = () => {
   const [realElasticLogs, setRealElasticLogs] = useState<any[]>([]);
   const [realHosts, setRealHosts] = useState<any[]>([]);
   const [realProblems, setRealProblems] = useState<any[]>([]);
+  const [securitySummary, setSecuritySummary] = useState<any>(null);
 
   const [realStats, setRealStats] = useState({
     totalHosts: 0,
@@ -145,15 +140,59 @@ const Index = () => {
     }
   };
 
+  const fetchSecuritySummary = async () => {
+    try {
+      const res = await fetch(
+        "http://10.10.10.1:3001/api/elastic/stats"
+      );
+
+      const elasticData = await res.json();
+
+      // Ambil zabbixProblemCount dari dashboard
+      const dashRes = await fetch(
+        "http://10.10.10.1:3001/api/zabbix/dashboard"
+      );
+
+      const dashData = await dashRes.json();
+
+      const zabbixCount = dashData?.zabbixProblemCount || 0;
+
+      const bruteForce = elasticData?.incidents?.bruteForce || 0;
+      const ddos = elasticData?.incidents?.ddos || 0;
+
+      const totalIncidents =
+        bruteForce +
+        ddos +
+        zabbixCount;
+
+      setSecuritySummary({
+        traffic: elasticData?.traffic || {},
+        securityEvents: elasticData?.securityEvents || {},
+        incidents: {
+          bruteForce,
+          ddos,
+          zabbixProblems: zabbixCount
+        },
+        totalIncidents,
+        eventsPerHour: elasticData?.eventsPerHour || []
+      });
+
+    } catch (err) {
+      console.error("Security summary fetch error:", err);
+    }
+  };
+
   // ================= AUTO REFRESH =================
   useEffect(() => {
 
     fetchDashboard();
     fetchElasticLogs();
+    fetchSecuritySummary();
 
     intervalRef.current = setInterval(() => {
       fetchDashboard();
       fetchElasticLogs();
+      fetchSecuritySummary();
     }, refreshInterval);
 
     return () => {
@@ -174,7 +213,8 @@ const Index = () => {
 
   };
 
-  return (    
+
+  return (
     <div className="min-h-screen bg-background px-4 lg:px-6 py-4">
       <div className="max-w-[1600px] mx-auto">
 
@@ -183,12 +223,18 @@ const Index = () => {
           onManualRefresh={() => {
             fetchDashboard();
             fetchElasticLogs();
+            fetchSecuritySummary();
           }}
         />
 
         <StatsCards stats={realStats} />
 
-        <SecurityMetrics metrics={mockSecurityMetrics} />
+        <SecurityMetrics
+          bruteForce={securitySummary?.incidents?.bruteForce || 0}
+          ddos={securitySummary?.incidents?.ddos || 0}
+          authFailures={securitySummary?.securityEvents?.authFailures || 0}
+          totalIncidents={securitySummary?.totalIncidents || 0}
+        />
 
         {/* ===== MAIN GRID ===== */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
@@ -213,7 +259,7 @@ const Index = () => {
 
           {/* Chart */}
           <div className="h-[400px]">
-            <SecurityChart data={mockSecurityEvents} />
+            <SecurityChart data={securitySummary?.eventsPerHour || []} />
           </div>
 
         </div>

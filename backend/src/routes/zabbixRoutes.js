@@ -178,17 +178,14 @@ router.get("/dashboard", async (req, res) => {
   try {
 
     // 🔥 Ambil data final dari endpoint hosts
-    const hostsRes = await axios.get(
-      "http://localhost:3001/api/zabbix/hosts"
-    );
-
-    const hosts = hostsRes.data;
+    const hosts = await getHosts();
 
     if (!Array.isArray(hosts))
       return res.json({
         stats: {},
         hosts: [],
-        problems: []
+        problems: [],
+	zabbixProblemCount: 0,
       });
 
     // ================= STATS =================
@@ -208,7 +205,12 @@ router.get("/dashboard", async (req, res) => {
         : 0;
 
     // ================= PROBLEMS =================
-    const problems = await getProblems();
+    const allProblems = await getProblems();
+
+    // hanya problem aktif
+    const activeProblems = (allProblems || []).filter(
+      p => p.value == "1"
+    );
 
     res.json({
       stats: {
@@ -218,7 +220,8 @@ router.get("/dashboard", async (req, res) => {
         upPercentage
       },
       hosts,
-      problems
+      problems: activeProblems,
+      zabbixProblemCount: activeProblems.length
     });
 
   } catch (err) {

@@ -1,11 +1,31 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Shield } from 'lucide-react';
 
+interface BackendEvent {
+  key: number;
+  doc_count: number;
+  ssh_failures?: { doc_count: number };
+  nginx_requests?: { doc_count: number };
+}
+
 interface SecurityChartProps {
-  data: { hour: string; bruteForce: number; ddos: number; authFail: number }[];
+  data: BackendEvent[];
 }
 
 export function SecurityChart({ data }: SecurityChartProps) {
+
+  // 🔥 mapping backend → chart format
+  const chartData = data.map((item) => ({
+    hour: new Date(item.key)
+      .getHours()
+      .toString()
+      .padStart(2, "0") + ":00",
+
+    bruteForce: item.doc_count || 0,
+    ddos: item.nginx_requests?.doc_count || 0,
+    authFail: item.ssh_failures?.doc_count || 0,
+  }));
+
   return (
     <div className="panel-card h-full flex flex-col">
       <div className="flex items-center gap-2 p-4 border-b border-border">
@@ -15,7 +35,7 @@ export function SecurityChart({ data }: SecurityChartProps) {
 
       <div className="flex-1 p-4">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} barGap={1}>
+          <BarChart data={chartData} barGap={1}>
             <XAxis
               dataKey="hour"
               axisLine={false}
@@ -36,10 +56,7 @@ export function SecurityChart({ data }: SecurityChartProps) {
               }}
               labelStyle={{ color: 'hsl(215, 20%, 55%)' }}
             />
-            <Legend 
-              iconType="circle"
-              wrapperStyle={{ paddingTop: '10px' }}
-            />
+            <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px' }} />
             <Bar dataKey="bruteForce" name="Brute Force" fill="#ef4444" radius={[2, 2, 0, 0]} />
             <Bar dataKey="ddos" name="DDoS" fill="#a855f7" radius={[2, 2, 0, 0]} />
             <Bar dataKey="authFail" name="Auth Failure" fill="#f59e0b" radius={[2, 2, 0, 0]} />
