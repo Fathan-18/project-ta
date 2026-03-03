@@ -77,10 +77,10 @@ router.get("/hosts", async (req, res) => {
 
         metrics.forEach(m => {
 
-          if (m.key_ === "system.cpu.util")
+          if (m.key_.includes("system.cpu.util"))
             cpu = parseFloat(m.lastvalue);
 
-          if (m.key_ === "vm.memory.utilization")
+          if (m.key_.includes("vm.memory"))
             ram = parseFloat(m.lastvalue);
 
           if (m.key_.includes("net.if.in"))
@@ -178,7 +178,19 @@ router.get("/dashboard", async (req, res) => {
   try {
 
     // 🔥 Ambil data final dari endpoint hosts
-    const hosts = await getHosts();
+    const rawHosts = await getHosts();
+
+    const hosts = await Promise.all(
+      rawHosts.map(async (h) => {
+        const iface = await getInterface(h.hostid);
+
+        return {
+          ...h,
+          available: Number(iface?.available || 0)
+        };
+      })
+    );
+
 
     if (!Array.isArray(hosts))
       return res.json({

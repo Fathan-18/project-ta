@@ -45,24 +45,54 @@ const Index = () => {
     return `${Math.floor(seconds / 86400)}d ago`;
   };
 
-
   // ================= DASHBOARD FETCH =================
   const fetchDashboard = async () => {
     try {
-
       const res = await fetch(
         "http://10.10.10.1:3001/api/zabbix/dashboard"
       );
 
       const data = await res.json();
 
-      console.log("DASHBOARD API:", data);
+      setRealStats({
+        totalHosts: data?.stats?.totalHosts || 0,
+        serversUp: data?.stats?.serversUp || 0,
+        serversDown: data?.stats?.serversDown || 0,
+        upPercentage: data?.stats?.upPercentage || 0,
+      });
 
-      if (!data?.hosts) return;
+      const mappedProblems = (data.problems || []).map((p: any) => ({
+        id: p.triggerid,
+        host: p.hosts?.[0]?.host || "Unknown",
+        problem: p.description || "No description",
 
-      // ===== HOSTS =====
-      const mappedHosts = data.hosts.map((h: any) => ({
+        severity:
+          p.priority == 5 ? "disaster" :
+          p.priority == 4 ? "high" :
+          p.priority == 3 ? "warning" :
+          p.priority == 2 ? "average" :
+          p.priority == 1 ? "info" :
+          "info",
 
+        rawTimestamp: p.lastchange
+      }));
+
+      setRealProblems(mappedProblems);
+
+    } catch (err) {
+      console.error("Dashboard fetch error:", err);
+    }
+  };
+
+  const fetchHosts = async () => {
+    try {
+      const res = await fetch(
+        "http://10.10.10.1:3001/api/zabbix/hosts"
+      );
+
+      const data = await res.json();
+
+      const mappedHosts = data.map((h: any) => ({
         id: h.hostid,
         hostname: h.host,
         ip: h.ip || "-",
@@ -74,54 +104,17 @@ const Index = () => {
             ? "offline"
             : "unknown",
 
-        cpu: Number(h.cpu || 0),
-        ram: Number(h.ram || 0),
-
-        bwIn: h.bwIn || "0 bps",
-        bwOut: h.bwOut || "0 bps",
-
+        cpu: h.cpu,
+        ram: h.ram,
+        bwIn: h.bwIn,
+        bwOut: h.bwOut,
         lastCheck: formatTimeAgo(h.lastCheck),
-
       }));
 
       setRealHosts(mappedHosts);
 
-      // ===== STATS =====
-      setRealStats(data.stats);
-
-      // ===== PROBLEMS =====
-      const mappedProblems = (data.problems || []).map((p: any) => ({
-
-        id: p.triggerid,
-
-        host: p.hosts?.[0]?.host || "Unknown",
-
-        problem: p.description || "No description",
-
-        severity:
-          p.priority == 5 ? "disaster" :
-          p.priority == 4 ? "high" :
-          p.priority == 3 ? "warning" :
-          p.priority == 2 ? "average" :
-          p.priority == 1 ? "info" :
-          "info",
-
-        rawTimestamp: p.lastchange,
-
-        duration:
-          p.value == "0"
-            ? "resolved"
-            : "active",
-
-      }));
-
-      setRealProblems(mappedProblems);
-
-      // ===== LAST UPDATE =====
-      setLastUpdate(Date.now());
-
     } catch (err) {
-      console.error("Dashboard fetch error:", err);
+      console.error("Hosts fetch error:", err);
     }
   };
 
@@ -146,35 +139,14 @@ const Index = () => {
         "http://10.10.10.1:3001/api/elastic/stats"
       );
 
-      const elasticData = await res.json();
-
-      // Ambil zabbixProblemCount dari dashboard
-      const dashRes = await fetch(
-        "http://10.10.10.1:3001/api/zabbix/dashboard"
-      );
-
-      const dashData = await dashRes.json();
-
-      const zabbixCount = dashData?.zabbixProblemCount || 0;
-
-      const bruteForce = elasticData?.incidents?.bruteForce || 0;
-      const ddos = elasticData?.incidents?.ddos || 0;
-
-      const totalIncidents =
-        bruteForce +
-        ddos +
-        zabbixCount;
+      const data = await res.json();
 
       setSecuritySummary({
-        traffic: elasticData?.traffic || {},
-        securityEvents: elasticData?.securityEvents || {},
-        incidents: {
-          bruteForce,
-          ddos,
-          zabbixProblems: zabbixCount
-        },
-        totalIncidents,
-        eventsPerHour: elasticData?.eventsPerHour || []
+        traffic: data?.traffic || {},
+        securityEvents: data?.securityEvents || {},
+        incidents: data?.incidents || {},
+        totalIncidents: data?.totalIncidents || 0,
+        eventsPerHour: data?.eventsPerHour || [],
       });
 
     } catch (err) {
@@ -182,27 +154,25 @@ const Index = () => {
     }
   };
 
-  // ================= AUTO REFRESH =================
-  useEffect(() => {
-
+  const refreshAll = () => {
+    fetchHosts();
     fetchDashboard();
     fetchElasticLogs();
     fetchSecuritySummary();
+  };
 
-    intervalRef.current = setInterval(() => {
-      fetchDashboard();
-      fetchElasticLogs();
-      fetchSecuritySummary();
-    }, refreshInterval);
+  // ================= AUTO REFRESH =================
+  useEffect(() => {
+    refreshAll();
+
+    intervalRef.current = setInterval(refreshAll, refreshInterval);
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
     };
-
   }, [refreshInterval]);
-
 
   // ================= INTERVAL HANDLER =================
   const handleIntervalChange = (value: string) => {
@@ -220,11 +190,7 @@ const Index = () => {
 
         <Header
           onIntervalChange={handleIntervalChange}
-          onManualRefresh={() => {
-            fetchDashboard();
-            fetchElasticLogs();
-            fetchSecuritySummary();
-          }}
+          onManualRefresh={refreshAll}
         />
 
         <StatsCards stats={realStats} />

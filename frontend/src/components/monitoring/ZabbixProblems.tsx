@@ -49,11 +49,16 @@ const severityConfig: any = {
 export function ZabbixProblems({ problems }: ZabbixProblemsProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredProblems = problems.filter(
-    (p) =>
-      p.host.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.problem.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredProblems = problems.filter((p) => {
+    const host = p.host || "";
+    const problemText = p.problem || "";
+    const query = searchQuery.toLowerCase();
+
+    return (
+      host.toLowerCase().includes(query) ||
+      problemText.toLowerCase().includes(query)
+    );
+  });
 
   const criticalCount = problems.filter(
     (p) =>
@@ -169,10 +174,10 @@ export function ZabbixProblems({ problems }: ZabbixProblemsProps) {
 
                     <div className="mt-2 text-xs text-muted-foreground">
                       <div>
-                        {formatDateTime(problem.rawTimestamp)}
+                        {problem.rawTimestamp && formatDateTime(problem.rawTimestamp)}
                       </div>
                       <div className="text-[11px] text-muted-foreground">
-                        {timeAgo(problem.rawTimestamp)}
+                        {problem.rawTimestamp && timeAgo(problem.rawTimestamp)}
                       </div>
                     </div>
 
