@@ -11,6 +11,7 @@ const ELASTIC_URL = "http://10.10.10.10:9200";
 
 // ===== BRUTE FORCE COOLDOWN CACHE =====
 const bruteForceCooldown = {};
+const bruteForceFirstSeen = {};
 const COOLDOWN_TIME = 5 * 60 * 1000; // 5 menit
 
 // =======================
@@ -29,7 +30,7 @@ router.get("/logs", async (req, res) => {
               {
                 range: {
                   "@timestamp": {
-                    gte: "now-24h",
+                    gte: "now-5m",
                     lte: "now"
                   }
                 }
@@ -100,7 +101,7 @@ router.get("/logs", async (req, res) => {
         query: {
           range: {
             "@timestamp": {
-              gte: "now-24h",
+              gte: "now-5m",
               lte: "now"
             }
           }
@@ -151,6 +152,7 @@ router.get("/logs", async (req, res) => {
     const alertLogs = [];
     const nowTime = Date.now();
 
+    // LOOP //
     brute.ips.forEach(ip => {
 
       const lastAlertTime = bruteForceCooldown[ip];
@@ -159,15 +161,14 @@ router.get("/logs", async (req, res) => {
         lastAlertTime &&
         nowTime - lastAlertTime < COOLDOWN_TIME;
 
-      // Jika belum pernah alert atau cooldown sudah lewat
       if (!stillCooling) {
         bruteForceCooldown[ip] = nowTime;
+        bruteForceFirstSeen[ip] = nowTime;
       }
 
-      // SELALU tampilkan alert selama brute force masih terdeteksi
       alertLogs.push({
         id: `bruteforce-${ip}`,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(bruteForceFirstSeen[ip]).toISOString(),
         ip,
         method: "SSH",
         path: "Brute Force Detected",
@@ -201,7 +202,7 @@ router.get("/stats", async (req, res) => {
   try {
 
     const now = new Date();
-    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const last5m = new Date(now.getTime() - 5 * 60 * 1000);
 
     const response = await axios.post(
       `${ELASTIC_URL}/filebeat-*/_search`,
@@ -210,7 +211,7 @@ router.get("/stats", async (req, res) => {
         query: {
           range: {
             "@timestamp": {
-              gte: last24h.toISOString(),
+              gte: last5m.toISOString(),
               lte: now.toISOString()
             }
           }
@@ -339,10 +340,7 @@ router.get("/stats", async (req, res) => {
         bruteForce: brute.count,
         ddos: ddos.count,
         zabbixProblems: 0
-      },
-
-      totalIncidents:
-        brute.count + ddos.count
+      }
 
     });
 

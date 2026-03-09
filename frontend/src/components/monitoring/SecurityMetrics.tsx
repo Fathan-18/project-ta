@@ -1,21 +1,19 @@
-import { Shield, Zap, KeyRound, Activity } from 'lucide-react';
+import { Shield, Zap, KeyRound } from 'lucide-react';
 
 interface SecurityMetricsProps {
   bruteForce: number;
   ddos: number;
   authFailures: number;
-  totalIncidents: number;
 }
 
 export function SecurityMetrics({
   bruteForce,
   ddos,
   authFailures,
-  totalIncidents,
 }: SecurityMetricsProps) {
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
 
       <div className="metric-card">
         <Shield className="w-5 h-5 text-red-500 mx-auto mb-2" />
@@ -40,14 +38,6 @@ export function SecurityMetrics({
           Auth Failures
         </p>
       </div>
-
-      <div className="metric-card">
-        <Activity className="w-5 h-5 text-red-500 mx-auto mb-2" />
-        <p className="text-3xl font-bold text-red-500">{totalIncidents}</p>
-        <p className="text-xs text-muted-foreground uppercase tracking-wide mt-1">
-          Total Incidents
-        </p>
-     </div>
 
     </div>
   );

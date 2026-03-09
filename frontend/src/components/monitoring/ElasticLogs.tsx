@@ -183,7 +183,7 @@ export function ElasticLogs({ logs }: ElasticLogsProps) {
                  <div>
                    {log.timestamp ? formatDateTime(log.timestamp) : '-'}
                  </div>
-                 <div classname="text-[11px] text-muted-foreground">
+                 <div className="text-[11px] text-muted-foreground">
                    {log.timestamp ? timeAgo(log.timestamp) : ''}
                 </div>
               </div>

@@ -1,3 +1,4 @@
+import { supabase } from "@/lib/supabase";
 import { useEffect, useState, useRef } from "react";
 
 import { Header } from '@/components/monitoring/Header';
@@ -145,7 +146,6 @@ const Index = () => {
         traffic: data?.traffic || {},
         securityEvents: data?.securityEvents || {},
         incidents: data?.incidents || {},
-        totalIncidents: data?.totalIncidents || 0,
         eventsPerHour: data?.eventsPerHour || [],
       });
 
@@ -174,6 +174,18 @@ const Index = () => {
     };
   }, [refreshInterval]);
 
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+
+      if (!data.session) {
+        window.location.href = "/";
+      }
+    };
+
+    checkSession();
+  }, []);
+
   // ================= INTERVAL HANDLER =================
   const handleIntervalChange = (value: string) => {
 
@@ -199,7 +211,6 @@ const Index = () => {
           bruteForce={securitySummary?.incidents?.bruteForce || 0}
           ddos={securitySummary?.incidents?.ddos || 0}
           authFailures={securitySummary?.securityEvents?.authFailures || 0}
-          totalIncidents={securitySummary?.totalIncidents || 0}
         />
 
         {/* ===== MAIN GRID ===== */}

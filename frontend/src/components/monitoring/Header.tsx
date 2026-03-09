@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Server, Sun, Moon, RefreshCw, LayoutGrid } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
+import { supabase } from "@/lib/supabase";
+import { LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export const Header = ({
 onIntervalChange,
@@ -13,6 +16,11 @@ const [apiStatus, setApiStatus] = useState({
   zabbix: false,
   elasticsearch: false
 });
+
+const handleLogout = async () => {
+  await supabase.auth.signOut();
+  window.location.href = "http://10.10.10.1:8080";
+};
 
 // ================= CLOCK =================
 // ================= CLOCK =================
@@ -170,6 +178,14 @@ return ( <header className="flex items-center justify-between py-4 mb-6">
         <Moon className="w-5 h-5 text-slate-600" />
       )}
     </button>
+
+    <Button
+      variant="outline"
+      size="icon"
+      onClick={handleLogout}
+    >
+      <LogOut className="w-4 h-4" />
+    </Button>
 
   </div>
 </header>
