@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Server, Sun, Moon, RefreshCw, LayoutGrid } from 'lucide-react';
+import { Server, Sun, Moon, RefreshCw, LayoutGrid, LogOut } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import { supabase } from "@/lib/supabase";
-import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Header = ({
@@ -19,7 +18,7 @@ const [apiStatus, setApiStatus] = useState({
 
 const handleLogout = async () => {
   await supabase.auth.signOut();
-  window.location.href = "http://10.10.10.1:8080";
+  window.location.href = "/";
 };
 
 // ================= CLOCK =================
@@ -138,35 +137,9 @@ return ( <header className="flex items-center justify-between py-4 mb-6">
   </div>
 
   {/* ===== RIGHT ===== */}
-  <div className="flex items-center gap-4">
 
-    {/* INTERVAL DROPDOWN */}
-    <select
-      onChange={(e) => onIntervalChange(e.target.value)}
-      className="bg-card border border-border rounded-lg px-3 py-2 text-sm"
-    >
-      <option value="30s">30s</option>
-      <option value="1m">1m</option>
-      <option value="5m">5m</option>
-    </select>
+  <div className="flex items-center gap-3">
 
-    {/* REFRESH + LAYOUT */}
-    <div className="flex items-center gap-1 border border-border rounded-lg p-1">
-
-      <button className="p-2 hover:bg-accent rounded-md transition-colors">
-        <LayoutGrid className="w-4 h-4 text-muted-foreground" />
-      </button>
-
-      <button
-        onClick={onManualRefresh}
-        className="p-2 hover:bg-accent rounded-md transition-colors"
-      >
-        <RefreshCw className="w-4 h-4 text-muted-foreground" />
-      </button>
-
-    </div>
-
-    {/* THEME TOGGLE */}
     <button
       onClick={toggleTheme}
       className="p-2 bg-card border border-border rounded-lg hover:bg-accent transition-colors"
@@ -178,16 +151,19 @@ return ( <header className="flex items-center justify-between py-4 mb-6">
         <Moon className="w-5 h-5 text-slate-600" />
       )}
     </button>
-
+ 
     <Button
       variant="outline"
-      size="icon"
       onClick={handleLogout}
+      className="flex items-center gap-2 px-4 text-sm"
     >
       <LogOut className="w-4 h-4" />
+      <span>Logout</span>
     </Button>
-
+  
   </div>
+  
 </header>
 );
 };
+  

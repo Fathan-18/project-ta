@@ -6,7 +6,6 @@ import { StatsCards } from '@/components/monitoring/StatsCards';
 import { SecurityMetrics } from '@/components/monitoring/SecurityMetrics';
 import { ZabbixProblems } from '@/components/monitoring/ZabbixProblems';
 import { ElasticLogs } from '@/components/monitoring/ElasticLogs';
-import { SecurityChart } from '@/components/monitoring/SecurityChart';
 import { HostsTable } from '@/components/monitoring/HostsTable';
 import { AttackChart } from "@/components/monitoring/AttackChart";
 
@@ -214,7 +213,7 @@ const Index = () => {
         />
 
         {/* ===== MAIN GRID ===== */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 
           {/* Zabbix */}
           <div className="h-[400px]">
@@ -222,21 +221,11 @@ const Index = () => {
           </div>
 
           {/* Elastic Section */}
-          <div className="flex flex-col gap-4">
 
-            {/* Elastic Logs */}
-
-            <div className="h-[400px]">
-
-              <ElasticLogs logs={realElasticLogs} />
-
-            </div>
-
-          </div>
-
-          {/* Chart */}
           <div className="h-[400px]">
-            <SecurityChart data={securitySummary?.eventsPerHour || []} />
+
+            <ElasticLogs logs={realElasticLogs} />
+
           </div>
 
         </div>

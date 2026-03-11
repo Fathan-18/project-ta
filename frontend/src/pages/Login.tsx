@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Monitor } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -6,36 +6,46 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
 
-const Index = () => {
-  const [username, setUsername] = useState("");
+const Login = () => {
+  const [rememberMe, setRememberMe] = useState(
+    !!localStorage.getItem("savedEmail")
+  );
+
+  const [username, setUsername] = useState(
+    localStorage.getItem("savedEmail") || ""
+  );
   const [password, setPassword] = useState("");
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+
+      if (data.session) {
+        window.location.href = "/dashboard";
+      }
+    };
+  
+    checkSession();
+  }, []);
 
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithPassword({
       email: username,
       password,
     });
-
+  
     if (error) {
       alert(error.message);
       return;
+    }
+
+    if (rememberMe) {
+      localStorage.setItem("savedEmail", username);
+    } else {
+      localStorage.removeItem("savedEmail");
     }
 
     window.location.href = "/dashboard";
-  };
-
-  const handleRegister = async () => {
-    const { error } = await supabase.auth.signUp({
-      email: username,
-      password,
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    alert("User berhasil dibuat, sekarang login.");
   };
 
   return (
@@ -80,7 +90,11 @@ const Index = () => {
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Checkbox id="remember" />
+                <Checkbox
+                  id="remember"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked === true)}
+                />
                 <label htmlFor="remember" className="text-sm text-foreground">
                   Remember me
                 </label>
@@ -124,4 +138,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default Login;

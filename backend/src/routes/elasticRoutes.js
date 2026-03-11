@@ -1,5 +1,3 @@
-// backend/src/routes/elasticRoutes.js
-
 import express from "express";
 import axios from "axios";
 import { detectBruteForce } from "../detectors/bruteForceDetector.js";
@@ -8,11 +6,6 @@ import { detectDdos } from "../detectors/ddosDetector.js";
 const router = express.Router();
 const ELASTIC_URL = "http://10.10.10.10:9200";
 
-
-// ===== BRUTE FORCE COOLDOWN CACHE =====
-const bruteForceCooldown = {};
-const bruteForceFirstSeen = {};
-const COOLDOWN_TIME = 5 * 60 * 1000; // 5 menit
 
 // =======================
 // GET LOGS (VIEWER ONLY)
@@ -30,7 +23,7 @@ router.get("/logs", async (req, res) => {
               {
                 range: {
                   "@timestamp": {
-                    gte: "now-5m",
+                    gte: "now-24h",
                     lte: "now"
                   }
                 }
@@ -61,8 +54,12 @@ router.get("/logs", async (req, res) => {
       if (src.event?.dataset === "system.auth") {
         const outcome = src.event?.outcome || "";
         const user = src.user?.name || "-";
+        const message = src.message || "";
 
-        if (outcome === "failure") {
+        if (
+          outcome === "failure" ||
+          message.includes("Failed password")
+        ) {
           severity = "high";
           attackType = "ssh_failed_login";
         }
@@ -73,7 +70,10 @@ router.get("/logs", async (req, res) => {
           ip,
           method: "SSH",
           path: `SSH Login (${user})`,
-          status: outcome === "failure" ? 401 : 200,
+          status:
+            outcome === "failure" || message.includes("Failed password")
+              ? 401
+              : 200,
           severity,
           attackType
         };
@@ -101,47 +101,84 @@ router.get("/logs", async (req, res) => {
         query: {
           range: {
             "@timestamp": {
-              gte: "now-5m",
+              gte: "now-24h",
               lte: "now"
             }
           }
         },
         aggs: {
-          ssh_activity: {
-            filter: {
-              term: { "event.dataset": "system.auth" }
-            },
-            aggs: {
-              by_ip: {
-                terms: {
-                  field: "source.ip",
-                  size: 100
+            ssh_activity: {
+                filter: {
+                term: { "event.dataset": "system.auth" }
                 },
                 aggs: {
-                  per_minute: {
-                    date_histogram: {
-                      field: "@timestamp",
-                      fixed_interval: "1m"
+                by_ip: {
+                    terms: {
+                    field: "source.ip",
+                    size: 100
                     },
                     aggs: {
-                      failures: {
-                        filter: {
-                          term: { "event.outcome": "failure" }
+                    per_minute: {
+                        date_histogram: {
+                        field: "@timestamp",
+                        fixed_interval: "1m"
+                        },
+                        aggs: {
+                        failures: {
+                            filter: {
+                            bool: {
+                                should: [
+                                { term: { "event.outcome": "failure" } },
+                                { match_phrase: { "message": "Failed password" } }
+                                ],
+                                minimum_should_match: 1
+                            }
+                            }
+                        },
+                        success: {
+                            filter: {
+                            term: { "event.outcome": "success" }
+                            }
                         }
-                      },
-                      success: {
-                        filter: {
-                          term: { "event.outcome": "success" }
                         }
-                      }
                     }
-                  }
+                    }
+                }
+                }
+            },
+
+            nginx_by_ip: {
+                filter: {
+                    bool: {
+                    must: [
+                        { term: { "event.dataset": "nginx.access" } },
+                        {
+                        terms: {
+                            "http.response.status_code": [404, 429, 403]
+                        }
+                        }
+                    ]
+                    }
+                },
+                aggs: {
+                    by_ip: {
+                    terms: {
+                        field: "source.ip",
+                        size: 100
+                    },
+                    aggs: {
+                        per_minute: {
+                        date_histogram: {
+                            field: "@timestamp",
+                            fixed_interval: "1m"
+                        }
+                        }
+                    }
+                    }
                 }
               }
-            }
-          }
+           }
         }
-      }
     );
 
     const brute = detectBruteForce(
@@ -149,26 +186,20 @@ router.get("/logs", async (req, res) => {
       5
     );
 
+    const ddos = detectDdos(
+      aggResponse.data.aggregations,
+      50
+    );
+
     const alertLogs = [];
-    const nowTime = Date.now();
 
     // LOOP //
-    brute.ips.forEach(ip => {
-
-      const lastAlertTime = bruteForceCooldown[ip];
-
-      const stillCooling =
-        lastAlertTime &&
-        nowTime - lastAlertTime < COOLDOWN_TIME;
-
-      if (!stillCooling) {
-        bruteForceCooldown[ip] = nowTime;
-        bruteForceFirstSeen[ip] = nowTime;
-      }
+    brute.events.forEach(event => {
+      const ip = event.ip;
 
       alertLogs.push({
-        id: `bruteforce-${ip}`,
-        timestamp: new Date(bruteForceFirstSeen[ip]).toISOString(),
+        id: `bruteforce-${ip}-${event.timestamp}`,
+        timestamp: event.timestamp,
         ip,
         method: "SSH",
         path: "Brute Force Detected",
@@ -176,12 +207,36 @@ router.get("/logs", async (req, res) => {
         severity: "critical",
         attackType: "ssh_bruteforce"
       });
+    });
 
+    ddos.events.forEach(event => {
+      alertLogs.push({
+        id: `ddos-${event.ip}-${event.timestamp}`,
+        timestamp: event.timestamp,
+        ip: event.ip,
+        method: "HTTP",
+        path: "DDoS Detected",
+        status: 429,
+        severity: "critical",
+        attackType: "ddos"
+      });
+    });
+
+    const filteredLogs = logs.filter(log => {
+      if (
+        log.attackType === "normal" &&
+        log.status === 404 &&
+        ddos.events.some(e => e.ip === log.ip)
+      ) {
+        return false;
+      }
+
+      return true;
     });
 
     const finalLogs = [
       ...alertLogs,
-      ...logs
+      ...filteredLogs
     ].sort((a, b) =>
       new Date(b.timestamp) - new Date(a.timestamp)
     );
@@ -202,7 +257,7 @@ router.get("/stats", async (req, res) => {
   try {
 
     const now = new Date();
-    const last5m = new Date(now.getTime() - 5 * 60 * 1000);
+    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     const response = await axios.post(
       `${ELASTIC_URL}/filebeat-*/_search`,
@@ -211,7 +266,7 @@ router.get("/stats", async (req, res) => {
         query: {
           range: {
             "@timestamp": {
-              gte: last5m.toISOString(),
+              gte: last24h.toISOString(),
               lte: now.toISOString()
             }
           }
@@ -234,9 +289,13 @@ router.get("/stats", async (req, res) => {
             filter: {
               bool: {
                 must: [
-                  { term: { "event.dataset": "system.auth" } },
-                  { term: { "event.outcome": "failure" } }
-                ]
+                  { term: { "event.dataset": "system.auth" } }
+                ],
+                should: [
+                  { term: { "event.outcome": "failure" } },
+                  { match_phrase: { "message": "Failed password" } }
+                ],
+                minimum_should_match: 1
               }
             }
           },
@@ -275,7 +334,13 @@ router.get("/stats", async (req, res) => {
                     aggs: {
                       failures: {
                         filter: {
-                          term: { "event.outcome": "failure" }
+                          bool: {
+                            should: [
+                              { term: { "event.outcome": "failure" } },
+                              { match_phrase: { "message": "Failed password" } }
+                            ],
+                            minimum_should_match: 1
+                          }
                         }
                       },
                       success: {
@@ -290,28 +355,36 @@ router.get("/stats", async (req, res) => {
             }
           },
 
-          nginx_by_ip: {
+        nginx_by_ip: {
             filter: {
-              bool: {
+                bool: {
                 must: [
-                  { term: { "event.dataset": "nginx.access" } },
-                  {
+                    { term: { "event.dataset": "nginx.access" } },
+                    {
                     terms: {
-                      "http.response.status_code": [404, 429, 403]
+                        "http.response.status_code": [404, 429, 403]
                     }
-                  }
+                    }
                 ]
-              }
+                }
             },
             aggs: {
-              by_ip: {
+                by_ip: {
                 terms: {
-                  field: "source.ip",
-                  size: 100
+                    field: "source.ip",
+                    size: 100
+                },
+                aggs: {
+                    per_minute: {
+                    date_histogram: {
+                        field: "@timestamp",
+                        fixed_interval: "1m"
+                    }
+                    }
                 }
-              }
+                }
             }
-          }
+            }
 
         }
       }

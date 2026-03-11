@@ -2,7 +2,7 @@ export function detectBruteForce(aggregations, threshold = 5) {
 
   const result = {
     count: 0,
-    ips: []
+    events: []
   };
 
   const buckets =
@@ -14,7 +14,7 @@ export function detectBruteForce(aggregations, threshold = 5) {
     const minuteBuckets =
       ipBucket.per_minute?.buckets || [];
 
-    const hasBruteForce = minuteBuckets.some(minute => {
+    minuteBuckets.forEach(minute => {
 
       const failureCount =
         minute.failures?.doc_count || 0;
@@ -22,17 +22,19 @@ export function detectBruteForce(aggregations, threshold = 5) {
       const successCount =
         minute.success?.doc_count || 0;
 
-      return (
+      if (
         failureCount >= threshold &&
         successCount === 0
-      );
+      ) {
+        result.count++;
+
+        result.events.push({
+          ip,
+          timestamp: minute.key_as_string
+        });
+      }
 
     });
-
-    if (hasBruteForce) {
-      result.count++;
-      result.ips.push(ip);
-    }
 
   });
 

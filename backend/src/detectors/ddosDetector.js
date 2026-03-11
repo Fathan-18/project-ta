@@ -1,15 +1,28 @@
-// backend/src/detectors/ddosDetector.js
-
 export function detectDdos(aggregations, threshold = 50) {
+  const result = {
+    count: 0,
+    events: []
+  };
+
   const buckets =
     aggregations?.nginx_by_ip?.by_ip?.buckets || [];
 
-  const attackers = buckets
-    .filter(bucket => bucket.doc_count >= threshold)
-    .map(bucket => bucket.key);
+  buckets.forEach(ipBucket => {
+    const ip = ipBucket.key;
+    const minuteBuckets =
+      ipBucket.per_minute?.buckets || [];
 
-  return {
-    count: attackers.length,
-    ips: attackers
-  };
+    minuteBuckets.forEach(minute => {
+      if (minute.doc_count >= threshold) {
+        result.count++;
+
+        result.events.push({
+          ip,
+          timestamp: minute.key_as_string
+        });
+      }
+    });
+  });
+
+  return result;
 }

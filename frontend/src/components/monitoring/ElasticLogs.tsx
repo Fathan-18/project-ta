@@ -48,8 +48,8 @@ export function ElasticLogs({ logs }: ElasticLogsProps) {
   const formatDateTime = (timestamp: string) => {
     const date = new Date(timestamp);
 
-    const formatted = date.toLocaleDateString("en-GB") + 
-      " | " + 
+    const formatted = date.toLocaleDateString("en-GB") +
+      " | " +
       date.toLocaleTimeString("en-US");
 
     return formatted;
@@ -64,6 +64,17 @@ export function ElasticLogs({ logs }: ElasticLogsProps) {
 
     return `~ ${Math.floor(seconds / 86400)} Days Ago`;
   };
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const logsPerPage = 10;
+
+  const indexOfLastLog = currentPage * logsPerPage;
+  const indexOfFirstLog = indexOfLastLog - logsPerPage;
+
+  const currentLogs = filteredLogs.slice(
+    indexOfFirstLog,
+    indexOfLastLog
+  );
 
   return (
     <div className="panel-card h-full flex flex-col">
@@ -116,7 +127,7 @@ export function ElasticLogs({ logs }: ElasticLogsProps) {
             No logs matching query
           </div>
         ) : (
-          filteredLogs.map((log: any) => (
+          currentLogs.map((log: any) => (
             <div
               key={log.id}
               onClick={() =>
@@ -224,7 +235,7 @@ export function ElasticLogs({ logs }: ElasticLogsProps) {
                       {log.userAgent}
                     </div>
                   )}
-                  
+
                   {log.os && (
                     <div>
                       <span className="font-semibold">OS:</span> {log.os}
@@ -251,6 +262,31 @@ export function ElasticLogs({ logs }: ElasticLogsProps) {
           ))
         )}
       </div>
+      <div className="flex justify-end items-center gap-2 p-3 border-t border-border">
+        <button
+            onClick={() =>
+            setCurrentPage((prev) => Math.max(prev - 1, 1))
+            }
+            className="px-2 py-1 border rounded text-xs"
+        >
+            Prev
+        </button>
+
+        <span className="text-xs">
+            {currentPage}
+        </span>
+
+        <button
+            onClick={() =>
+            setCurrentPage((prev) =>
+                indexOfLastLog < filteredLogs.length ? prev + 1 : prev
+            )
+            }
+            className="px-2 py-1 border rounded text-xs"
+        >
+            Next
+        </button>
+        </div>
     </div>
   );
 }
